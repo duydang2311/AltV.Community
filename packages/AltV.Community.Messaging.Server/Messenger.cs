@@ -7,7 +7,7 @@ using AltV.Net.Elements.Entities;
 
 namespace AltV.Community.Messaging.Server;
 
-public sealed class Messenger(IMessagingContextFactory messagingContextFactory) : IMessenger
+public class Messenger(IMessagingContextFactory messagingContextFactory) : IMessenger
 {
     private readonly ConcurrentDictionary<(IPlayer, string), StateBag> messageTasks = [];
 
