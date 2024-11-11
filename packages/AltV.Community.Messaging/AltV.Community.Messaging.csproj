@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>AltV.Community.Messaging</PackageId>
+    <Version>0.0.1</Version>
+    <Authors>duydang2311</Authors>
+    <PackageTags>altv altv gtav gta5 messaging</PackageTags>
+    <Description>Messaging implementation for alt:V client</Description>
+    <PackageProjectUrl>https://github.com/duydang2311/AltV.Community</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/duydang2311/AltV.Community</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AltV.Community.Messaging.Server" />
+    <InternalsVisibleTo Include="AltV.Community.Messaging.Client" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>
