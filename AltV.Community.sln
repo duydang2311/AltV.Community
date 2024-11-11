@@ -13,6 +13,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltV.Community.Messaging.Cl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltV.Community.Events", "packages\AltV.Community.Events\AltV.Community.Events.csproj", "{43BA058F-C0DD-46E3-827D-666DF211ADC6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltV.Community.MValueAdapters.Generators", "packages\AltV.Community.MValueAdapters.Generators\AltV.Community.MValueAdapters.Generators.csproj", "{88A7ED54-79D8-4784-83F3-9BA2E65AFB82}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AltV.Community.MValueAdapters.Generators.Abstractions", "packages\AltV.Community.MValueAdapters.Generators.Abstractions\AltV.Community.MValueAdapters.Generators.Abstractions.csproj", "{5DB45224-F0C5-4C17-8633-1EAEA7577FD5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,11 +42,21 @@ Global
 		{43BA058F-C0DD-46E3-827D-666DF211ADC6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{43BA058F-C0DD-46E3-827D-666DF211ADC6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{43BA058F-C0DD-46E3-827D-666DF211ADC6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{88A7ED54-79D8-4784-83F3-9BA2E65AFB82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88A7ED54-79D8-4784-83F3-9BA2E65AFB82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88A7ED54-79D8-4784-83F3-9BA2E65AFB82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88A7ED54-79D8-4784-83F3-9BA2E65AFB82}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5DB45224-F0C5-4C17-8633-1EAEA7577FD5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5DB45224-F0C5-4C17-8633-1EAEA7577FD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5DB45224-F0C5-4C17-8633-1EAEA7577FD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5DB45224-F0C5-4C17-8633-1EAEA7577FD5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{984EF7DE-B1CD-4CC3-8486-6F2042C610D3} = {5891858B-1DD3-4686-9982-96B9C7383E7E}
 		{E2040E8E-4C3E-4BE7-9AAE-6D826B9B5CDD} = {5891858B-1DD3-4686-9982-96B9C7383E7E}
 		{86B74254-963B-4F41-9D95-BAD3956BE8EB} = {5891858B-1DD3-4686-9982-96B9C7383E7E}
 		{43BA058F-C0DD-46E3-827D-666DF211ADC6} = {5891858B-1DD3-4686-9982-96B9C7383E7E}
+		{88A7ED54-79D8-4784-83F3-9BA2E65AFB82} = {5891858B-1DD3-4686-9982-96B9C7383E7E}
+		{5DB45224-F0C5-4C17-8633-1EAEA7577FD5} = {5891858B-1DD3-4686-9982-96B9C7383E7E}
 	EndGlobalSection
 EndGlobal
