@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <PackageId>AltV.Community.Events</PackageId>
+        <Version>0.0.2</Version>
+        <Authors>duydang2311</Authors>
+        <PackageTags>altv gtav gta5 event async async-event</PackageTags>
+        <Description>Create events as classes</Description>
+        <PackageProjectUrl>https://github.com/duydang2311/AltV.Community</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/duydang2311/AltV.Community</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="" />
+        <None Include="../../LICENSE" Pack="true" PackagePath="" />
+    </ItemGroup>
+
+</Project>
