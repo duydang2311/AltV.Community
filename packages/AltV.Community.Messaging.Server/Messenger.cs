@@ -17,7 +17,7 @@ public class Messenger(
 
     public void Publish(IPlayer player, string eventName, object?[]? args = null)
     {
-        player.Emit(eventName, BuildArgs(messageIdProvider.GetNext(), args));
+        player.Emit(eventName, BuildArgs(0, args));
     }
 
     public Task<object?> SendAsync(IPlayer player, string eventName, object?[]? args = null)

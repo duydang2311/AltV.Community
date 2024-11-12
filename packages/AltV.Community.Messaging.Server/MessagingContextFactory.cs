@@ -12,6 +12,8 @@ public sealed class MessagingContextFactory : IMessagingContextFactory
     )
         where TPlayer : IPlayer
     {
-        return new MessagingContext<TPlayer>(player, messageId, eventName);
+        return messageId == 0
+            ? new ResponselessMessagingContext<TPlayer>(player)
+            : new MessagingContext<TPlayer>(player, messageId, eventName);
     }
 }

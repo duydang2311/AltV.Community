@@ -6,6 +6,8 @@ public sealed class MessagingContextFactory : IMessagingContextFactory
 {
     public IMessagingContext CreateMessagingContext(string eventName, long messageId)
     {
-        return new MessagingContext(eventName, messageId);
+        return messageId == 0
+            ? ResponselessMessagingContext.Instance
+            : new MessagingContext(eventName, messageId);
     }
 }

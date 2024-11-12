@@ -3,7 +3,7 @@ using AltV.Net.Elements.Entities;
 
 namespace AltV.Community.Messaging.Server;
 
-public sealed class MessagingContext<TPlayer>(TPlayer player, long messageId, string eventName)
+public class MessagingContext<TPlayer>(TPlayer player, long messageId, string eventName)
     : IMessagingContext<TPlayer>
     where TPlayer : IPlayer
 {
