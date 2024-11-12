@@ -6,15 +6,17 @@ using AltV.Net.Client;
 
 namespace AltV.Community.Messaging.Client;
 
-public class Messenger(IMessagingContextFactory messagingContextFactory) : IMessenger
+public class Messenger(
+    IMessagingContextFactory messagingContextFactory,
+    IMessageIdProvider messageIdProvider
+) : IMessenger
 {
-    private readonly ConcurrentDictionary<string, StateBag> messageTasks = [];
-
-    private readonly ConcurrentDictionary<string, Function> handlerTasks = [];
+    private readonly ConcurrentDictionary<long, StateBag> messageBags = [];
+    private readonly ConcurrentDictionary<string, Function> answerHandlers = [];
 
     public void Publish(string eventName, object?[]? args = null)
     {
-        Alt.EmitServer(eventName, args ?? []);
+        Alt.EmitServer(eventName, BuildArgs(messageIdProvider.GetNext(), args));
     }
 
     public Task<object?> SendAsync(string eventName, object?[]? args = null)
@@ -28,71 +30,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
         return MapInternal<T>(bag.TaskCompletionSource.Task);
     }
 
-    public bool Answer(string eventName, object? answer)
+    public bool Answer(long messageId, object? answer)
     {
-        if (!messageTasks.TryRemove(eventName, out var bag))
+        if (!messageBags.TryRemove(messageId, out var bag))
         {
             return false;
         }
 
         return bag.TaskCompletionSource.TrySetResult(answer);
-    }
-
-    private StateBag SendAsyncInternal(string eventName, object?[]? args)
-    {
-        if (!messageTasks.TryGetValue(eventName, out var bag))
-        {
-            if (!handlerTasks.ContainsKey(eventName))
-            {
-                handlerTasks[eventName] = Alt.OnServer<object?>(
-                    eventName,
-                    (answer) =>
-                    {
-                        Answer(eventName, answer);
-                    }
-                );
-            }
-
-            var tcs = new TaskCompletionSource<object?>();
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var reg = cts.Token.Register(() =>
-            {
-                tcs.TrySetCanceled();
-            });
-            bag = new StateBag(tcs, cts, reg);
-            tcs.Task.ContinueWith(
-                (task, state) =>
-                {
-                    if (state is not StateBag stateBag)
-                    {
-                        return;
-                    }
-                    stateBag.Dispose();
-                },
-                bag
-            );
-            messageTasks[eventName] = bag;
-            Alt.EmitServer(eventName, args);
-        }
-        return bag;
-    }
-
-    private static async Task<T> MapInternal<T>(Task<object?> task)
-    {
-        var ret = await task.ConfigureAwait(false);
-        if (ret is T t)
-        {
-            return t;
-        }
-        throw new TypeMismatchException();
-    }
-
-    private static Action OnInternal(string eventName, Function function)
-    {
-        return () =>
-        {
-            Alt.OffClient(eventName, function);
-        };
     }
 
     public Action On(string eventName, Action<IMessagingContext> handler)
@@ -101,9 +46,9 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                () =>
+                (long messageId) =>
                 {
-                    handler(messagingContextFactory.CreateMessagingContext(eventName));
+                    handler(messagingContextFactory.CreateMessagingContext(eventName, messageId));
                 }
             )
         );
@@ -115,10 +60,12 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                () =>
+                (long messageId) =>
                 {
                     SafeFireAndForget(
-                        handler(messagingContextFactory.CreateMessagingContext(eventName))
+                        handler(
+                            messagingContextFactory.CreateMessagingContext(eventName, messageId)
+                        )
                     );
                 }
             )
@@ -131,9 +78,12 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1) =>
+                (long messageId, T1 arg1) =>
                 {
-                    handler(messagingContextFactory.CreateMessagingContext(eventName), arg1);
+                    handler(
+                        messagingContextFactory.CreateMessagingContext(eventName, messageId),
+                        arg1
+                    );
                 }
             )
         );
@@ -145,10 +95,13 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1) =>
+                (long messageId, T1 arg1) =>
                 {
                     SafeFireAndForget(
-                        handler(messagingContextFactory.CreateMessagingContext(eventName), arg1)
+                        handler(
+                            messagingContextFactory.CreateMessagingContext(eventName, messageId),
+                            arg1
+                        )
                     );
                 }
             )
@@ -161,9 +114,13 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2) =>
+                (long messageId, T1 arg1, T2 arg2) =>
                 {
-                    handler(messagingContextFactory.CreateMessagingContext(eventName), arg1, arg2);
+                    handler(
+                        messagingContextFactory.CreateMessagingContext(eventName, messageId),
+                        arg1,
+                        arg2
+                    );
                 }
             )
         );
@@ -175,18 +132,15 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2) =>
+                (long messageId, T1 arg1, T2 arg2) =>
                 {
                     SafeFireAndForget(
                         handler(
-                            messagingContextFactory.CreateMessagingContext(eventName),
+                            messagingContextFactory.CreateMessagingContext(eventName, messageId),
                             arg1,
                             arg2
                         )
                     );
-                    ;
-                    ;
-                    ;
                 }
             )
         );
@@ -198,10 +152,10 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(eventName),
+                        messagingContextFactory.CreateMessagingContext(eventName, messageId),
                         arg1,
                         arg2,
                         arg3
@@ -220,11 +174,11 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3) =>
                 {
                     SafeFireAndForget(
                         handler(
-                            messagingContextFactory.CreateMessagingContext(eventName),
+                            messagingContextFactory.CreateMessagingContext(eventName, messageId),
                             arg1,
                             arg2,
                             arg3
@@ -244,10 +198,10 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3, T4 arg4) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(eventName),
+                        messagingContextFactory.CreateMessagingContext(eventName, messageId),
                         arg1,
                         arg2,
                         arg3,
@@ -267,11 +221,11 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3, T4 arg4) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4) =>
                 {
                     SafeFireAndForget(
                         handler(
-                            messagingContextFactory.CreateMessagingContext(eventName),
+                            messagingContextFactory.CreateMessagingContext(eventName, messageId),
                             arg1,
                             arg2,
                             arg3,
@@ -292,10 +246,10 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(eventName),
+                        messagingContextFactory.CreateMessagingContext(eventName, messageId),
                         arg1,
                         arg2,
                         arg3,
@@ -316,11 +270,11 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5) =>
                 {
                     SafeFireAndForget(
                         handler(
-                            messagingContextFactory.CreateMessagingContext(eventName),
+                            messagingContextFactory.CreateMessagingContext(eventName, messageId),
                             arg1,
                             arg2,
                             arg3,
@@ -342,10 +296,10 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(eventName),
+                        messagingContextFactory.CreateMessagingContext(eventName, messageId),
                         arg1,
                         arg2,
                         arg3,
@@ -367,11 +321,11 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6) =>
                 {
                     SafeFireAndForget(
                         handler(
-                            messagingContextFactory.CreateMessagingContext(eventName),
+                            messagingContextFactory.CreateMessagingContext(eventName, messageId),
                             arg1,
                             arg2,
                             arg3,
@@ -394,10 +348,10 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(eventName),
+                        messagingContextFactory.CreateMessagingContext(eventName, messageId),
                         arg1,
                         arg2,
                         arg3,
@@ -420,11 +374,11 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnServer(
                 eventName,
-                (T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7) =>
+                (long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7) =>
                 {
                     SafeFireAndForget(
                         handler(
-                            messagingContextFactory.CreateMessagingContext(eventName),
+                            messagingContextFactory.CreateMessagingContext(eventName, messageId),
                             arg1,
                             arg2,
                             arg3,
@@ -437,6 +391,77 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
                 }
             )
         );
+    }
+
+    private void AnswerInternal(long messageId, object? answer)
+    {
+        Answer(messageId, answer);
+    }
+
+    private StateBag SendAsyncInternal(string eventName, object?[]? args)
+    {
+        var messageId = messageIdProvider.GetNext();
+        if (!answerHandlers.ContainsKey(eventName))
+        {
+            answerHandlers[eventName] = Alt.OnServer<long, object?>(eventName, AnswerInternal);
+        }
+        var tcs = new TaskCompletionSource<object?>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var reg = cts.Token.Register(() =>
+        {
+            tcs.TrySetCanceled();
+        });
+        var bag = new StateBag(tcs, cts, reg);
+        tcs.Task.ContinueWith(
+            (task, state) =>
+            {
+                if (state is not long messageId)
+                {
+                    return;
+                }
+                if (!messageBags.TryRemove(messageId, out var bag))
+                {
+                    return;
+                }
+                bag.Dispose();
+            },
+            messageId
+        );
+        messageBags[messageId] = bag;
+        Alt.EmitServer(eventName, BuildArgs(messageId, args));
+        return bag;
+    }
+
+    private static async Task<T> MapInternal<T>(Task<object?> task)
+    {
+        var ret = await task.ConfigureAwait(false);
+        if (ret is T t)
+        {
+            return t;
+        }
+        throw new TypeMismatchException();
+    }
+
+    private static Action OnInternal(string eventName, Function function)
+    {
+        return () =>
+        {
+            Alt.OffClient(eventName, function);
+        };
+    }
+
+    private static object?[] BuildArgs(long messageId, object?[]? args = null)
+    {
+        if (args is null)
+        {
+            return [messageId];
+        }
+
+        // c# client sandbox forbids spread syntax
+        var arr = new object?[args.Length + 1];
+        arr[0] = messageId;
+        Array.Copy(args, 0, arr, 1, args.Length);
+        return arr;
     }
 
     private static async void SafeFireAndForget(Task task)

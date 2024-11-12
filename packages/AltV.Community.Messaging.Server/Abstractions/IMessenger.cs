@@ -7,7 +7,6 @@ public interface IMessenger
     void Publish(IPlayer player, string eventName, object?[]? args = null);
     Task<object?> SendAsync(IPlayer player, string eventName, object?[]? args = null);
     Task<T> SendAsync<T>(IPlayer player, string eventName, object?[]? args = null);
-    bool Answer(IPlayer player, string eventName, object? answer);
 
     Action On<TPlayer>(string eventName, Action<IMessagingContext<TPlayer>> handler)
         where TPlayer : IPlayer;

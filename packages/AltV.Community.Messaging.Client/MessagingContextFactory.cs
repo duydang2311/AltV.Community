@@ -4,8 +4,8 @@ namespace AltV.Community.Messaging.Client;
 
 public sealed class MessagingContextFactory : IMessagingContextFactory
 {
-    public IMessagingContext CreateMessagingContext(string eventName)
+    public IMessagingContext CreateMessagingContext(string eventName, long messageId)
     {
-        return new MessagingContext(eventName);
+        return new MessagingContext(eventName, messageId);
     }
 }

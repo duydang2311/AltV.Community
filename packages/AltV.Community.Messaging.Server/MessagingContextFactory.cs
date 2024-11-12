@@ -7,10 +7,11 @@ public sealed class MessagingContextFactory : IMessagingContextFactory
 {
     public IMessagingContext<TPlayer> CreateMessagingContext<TPlayer>(
         TPlayer player,
+        long messageId,
         string eventName
     )
         where TPlayer : IPlayer
     {
-        return new MessagingContext<TPlayer>(player, eventName);
+        return new MessagingContext<TPlayer>(player, messageId, eventName);
     }
 }

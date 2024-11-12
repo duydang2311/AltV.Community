@@ -3,7 +3,7 @@ using AltV.Net.Client;
 
 namespace AltV.Community.Messaging.Client;
 
-public sealed class MessagingContext(string eventName) : IMessagingContext
+public sealed class MessagingContext(string eventName, long messageId) : IMessagingContext
 {
     private int responded;
 
@@ -13,6 +13,6 @@ public sealed class MessagingContext(string eventName) : IMessagingContext
         {
             return;
         }
-        Alt.EmitServer(eventName, value);
+        Alt.EmitServer(eventName, messageId, value);
     }
 }

@@ -7,15 +7,17 @@ using AltV.Net.Elements.Entities;
 
 namespace AltV.Community.Messaging.Server;
 
-public class Messenger(IMessagingContextFactory messagingContextFactory) : IMessenger
+public class Messenger(
+    IMessagingContextFactory messagingContextFactory,
+    IMessageIdProvider messageIdProvider
+) : IMessenger
 {
-    private readonly ConcurrentDictionary<(IPlayer, string), StateBag> messageTasks = [];
-
-    private readonly ConcurrentDictionary<string, Function> handlerTasks = [];
+    private readonly ConcurrentDictionary<(IPlayer, long), StateBag> messageBags = [];
+    private readonly ConcurrentDictionary<string, Function> messageHandlers = [];
 
     public void Publish(IPlayer player, string eventName, object?[]? args = null)
     {
-        player.Emit(eventName, args ?? []);
+        player.Emit(eventName, BuildArgs(messageIdProvider.GetNext(), args));
     }
 
     public Task<object?> SendAsync(IPlayer player, string eventName, object?[]? args = null)
@@ -29,55 +31,55 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
         return MapInternal<T>(bag.TaskCompletionSource.Task);
     }
 
-    public bool Answer(IPlayer player, string eventName, object? answer)
+    private void Answer(IPlayer player, long messageId, object? answer)
     {
-        var key = (player, eventName);
-        if (!messageTasks.TryRemove(key, out var bag))
+        var key = (player, messageId);
+        if (!messageBags.TryRemove(key, out var bag))
         {
-            return false;
+            return;
         }
 
-        return bag.TaskCompletionSource.TrySetResult(answer);
+        bag.TaskCompletionSource.TrySetResult(answer);
     }
 
     private StateBag SendAsyncInternal(IPlayer player, string eventName, object?[]? args)
     {
-        var key = (player, eventName);
-        if (!messageTasks.TryGetValue(key, out var bag))
+        var messageId = messageIdProvider.GetNext();
+        var key = (player, messageId);
+        if (!messageHandlers.ContainsKey(eventName))
         {
-            if (!handlerTasks.TryGetValue(eventName, out var f))
-            {
-                f = Alt.OnClient<IPlayer, object?>(
-                    eventName,
-                    (player, answer) =>
-                    {
-                        Answer(player, eventName, answer);
-                    }
-                );
-                handlerTasks[eventName] = f;
-            }
-
-            var tcs = new TaskCompletionSource<object?>();
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var reg = cts.Token.Register(() =>
-            {
-                tcs.TrySetCanceled();
-            });
-            bag = new StateBag(tcs, cts, reg);
-            tcs.Task.ContinueWith(
-                (task, state) =>
+            messageHandlers[eventName] = Alt.OnClient<IPlayer, long, object?>(
+                eventName,
+                (player, messageId, answer) =>
                 {
-                    if (state is not StateBag stateBag)
-                    {
-                        return;
-                    }
-                    bag.Dispose();
-                },
-                bag
+                    Answer(player, messageId, answer);
+                }
             );
-            messageTasks[key] = bag;
-            player.Emit(eventName, args);
         }
+
+        var tcs = new TaskCompletionSource<object?>();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var reg = cts.Token.Register(() =>
+        {
+            tcs.TrySetCanceled();
+        });
+        var bag = new StateBag(tcs, cts, reg);
+        tcs.Task.ContinueWith(
+            (task, state) =>
+            {
+                if (
+                    state is not long messageId
+                    || !messageBags.TryRemove((player, messageId), out var bag)
+                )
+                {
+                    return;
+                }
+                bag.Dispose();
+            },
+            messageId
+        );
+        messageBags[key] = bag;
+        player.Emit(eventName, BuildArgs(messageId, args));
         return bag;
     }
 
@@ -104,11 +106,13 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
     {
         return OnInternal(
             eventName,
-            Alt.OnClient<TPlayer>(
+            Alt.OnClient(
                 eventName,
-                (player) =>
+                (TPlayer player, long messageId) =>
                 {
-                    handler(messagingContextFactory.CreateMessagingContext(player, eventName));
+                    handler(
+                        messagingContextFactory.CreateMessagingContext(player, messageId, eventName)
+                    );
                 }
             )
         );
@@ -121,10 +125,10 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             AltAsync.OnClient(
                 eventName,
-                (TPlayer player) =>
+                (TPlayer player, long messageId) =>
                 {
                     return handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName)
+                        messagingContextFactory.CreateMessagingContext(player, messageId, eventName)
                     );
                 }
             )
@@ -138,10 +142,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1) =>
+                (TPlayer player, long messageId, T1 arg1) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1
                     );
                 }
@@ -159,10 +167,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             AltAsync.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1) =>
+                (TPlayer player, long messageId, T1 arg1) =>
                 {
                     return handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1
                     );
                 }
@@ -180,10 +192,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2) =>
+                (TPlayer player, long messageId, T1 arg1, T2 arg2) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2
                     );
@@ -202,10 +218,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             AltAsync.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2) =>
+                (TPlayer player, long messageId, T1 arg1, T2 arg2) =>
                 {
                     return handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2
                     );
@@ -224,10 +244,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3) =>
+                (TPlayer player, long messageId, T1 arg1, T2 arg2, T3 arg3) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3
@@ -247,10 +271,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             AltAsync.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3) =>
+                (TPlayer player, long messageId, T1 arg1, T2 arg2, T3 arg3) =>
                 {
                     return handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3
@@ -270,10 +298,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3, T4 arg4) =>
+                (TPlayer player, long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3,
@@ -294,10 +326,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             AltAsync.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3, T4 arg4) =>
+                (TPlayer player, long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4) =>
                 {
                     return handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3,
@@ -318,10 +354,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5) =>
+                (TPlayer player, long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3,
@@ -343,10 +383,14 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             AltAsync.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5) =>
+                (TPlayer player, long messageId, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5) =>
                 {
                     return handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3,
@@ -368,10 +412,23 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6) =>
+                (
+                    TPlayer player,
+                    long messageId,
+                    T1 arg1,
+                    T2 arg2,
+                    T3 arg3,
+                    T4 arg4,
+                    T5 arg5,
+                    T6 arg6
+                ) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3,
@@ -394,10 +451,23 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             AltAsync.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6) =>
+                (
+                    TPlayer player,
+                    long messageId,
+                    T1 arg1,
+                    T2 arg2,
+                    T3 arg3,
+                    T4 arg4,
+                    T5 arg5,
+                    T6 arg6
+                ) =>
                 {
                     return handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3,
@@ -420,10 +490,24 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             Alt.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7) =>
+                (
+                    TPlayer player,
+                    long messageId,
+                    T1 arg1,
+                    T2 arg2,
+                    T3 arg3,
+                    T4 arg4,
+                    T5 arg5,
+                    T6 arg6,
+                    T7 arg7
+                ) =>
                 {
                     handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3,
@@ -447,10 +531,24 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
             eventName,
             AltAsync.OnClient(
                 eventName,
-                (TPlayer player, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7) =>
+                (
+                    TPlayer player,
+                    long messageId,
+                    T1 arg1,
+                    T2 arg2,
+                    T3 arg3,
+                    T4 arg4,
+                    T5 arg5,
+                    T6 arg6,
+                    T7 arg7
+                ) =>
                 {
                     return handler(
-                        messagingContextFactory.CreateMessagingContext(player, eventName),
+                        messagingContextFactory.CreateMessagingContext(
+                            player,
+                            messageId,
+                            eventName
+                        ),
                         arg1,
                         arg2,
                         arg3,
@@ -462,6 +560,15 @@ public class Messenger(IMessagingContextFactory messagingContextFactory) : IMess
                 }
             )
         );
+    }
+
+    private static object?[] BuildArgs(long messageId, object?[]? args = null)
+    {
+        if (args is null)
+        {
+            return [messageId];
+        }
+        return [messageId, .. args];
     }
 
     private class StateBag(
