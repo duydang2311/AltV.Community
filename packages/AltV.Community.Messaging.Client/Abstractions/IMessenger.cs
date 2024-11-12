@@ -5,7 +5,6 @@ public interface IMessenger
     void Publish(string eventName, object?[]? args = null);
     Task<object?> SendAsync(string eventName, object?[]? args = null);
     Task<T> SendAsync<T>(string eventName, object?[]? args = null);
-    bool Answer(long messageId, object? answer);
 
     Action On(string eventName, Action<IMessagingContext> handler);
     Action On(string eventName, Func<IMessagingContext, Task> handler);

@@ -48,13 +48,7 @@ public class Messenger(
         var key = (player, messageId);
         if (!messageHandlers.ContainsKey(eventName))
         {
-            messageHandlers[eventName] = Alt.OnClient<IPlayer, long, object?>(
-                eventName,
-                (player, messageId, answer) =>
-                {
-                    Answer(player, messageId, answer);
-                }
-            );
+            messageHandlers[eventName] = Alt.OnClient<IPlayer, long, object?>(eventName, Answer);
         }
 
         var tcs = new TaskCompletionSource<object?>();
@@ -64,7 +58,7 @@ public class Messenger(
             tcs.TrySetCanceled();
         });
         var bag = new StateBag(tcs, cts, reg);
-        tcs.Task.ContinueWith(
+        _ = tcs.Task.ContinueWith(
             (task, state) =>
             {
                 if (
@@ -76,7 +70,10 @@ public class Messenger(
                 }
                 bag.Dispose();
             },
-            messageId
+            messageId,
+            CancellationToken.None,
+            TaskContinuationOptions.NotOnRanToCompletion,
+            TaskScheduler.Default
         );
         messageBags[key] = bag;
         player.Emit(eventName, BuildArgs(messageId, args));

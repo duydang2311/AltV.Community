@@ -30,16 +30,6 @@ public class Messenger(
         return MapInternal<T>(bag.TaskCompletionSource.Task);
     }
 
-    public bool Answer(long messageId, object? answer)
-    {
-        if (!messageBags.TryRemove(messageId, out var bag))
-        {
-            return false;
-        }
-
-        return bag.TaskCompletionSource.TrySetResult(answer);
-    }
-
     public Action On(string eventName, Action<IMessagingContext> handler)
     {
         return OnInternal(
@@ -393,17 +383,12 @@ public class Messenger(
         );
     }
 
-    private void AnswerInternal(long messageId, object? answer)
-    {
-        Answer(messageId, answer);
-    }
-
     private StateBag SendAsyncInternal(string eventName, object?[]? args)
     {
         var messageId = messageIdProvider.GetNext();
         if (!answerHandlers.ContainsKey(eventName))
         {
-            answerHandlers[eventName] = Alt.OnServer<long, object?>(eventName, AnswerInternal);
+            answerHandlers[eventName] = Alt.OnServer<long, object?>(eventName, Answer);
         }
         var tcs = new TaskCompletionSource<object?>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -412,20 +397,19 @@ public class Messenger(
             tcs.TrySetCanceled();
         });
         var bag = new StateBag(tcs, cts, reg);
-        tcs.Task.ContinueWith(
+        _ = tcs.Task.ContinueWith(
             (task, state) =>
             {
-                if (state is not long messageId)
-                {
-                    return;
-                }
-                if (!messageBags.TryRemove(messageId, out var bag))
+                if (state is not long messageId || !messageBags.TryRemove(messageId, out var bag))
                 {
                     return;
                 }
                 bag.Dispose();
             },
-            messageId
+            messageId,
+            CancellationToken.None,
+            TaskContinuationOptions.NotOnRanToCompletion,
+            TaskScheduler.Default
         );
         messageBags[messageId] = bag;
         Alt.EmitServer(eventName, BuildArgs(messageId, args));
@@ -462,6 +446,16 @@ public class Messenger(
         arr[0] = messageId;
         Array.Copy(args, 0, arr, 1, args.Length);
         return arr;
+    }
+
+    private void Answer(long messageId, object? answer)
+    {
+        if (!messageBags.TryRemove(messageId, out var bag))
+        {
+            return;
+        }
+
+        bag.TaskCompletionSource.TrySetResult(answer);
     }
 
     private static async void SafeFireAndForget(Task task)
