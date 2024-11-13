@@ -9,5 +9,5 @@ This package implements messaging for server-side alt:V.
 #### Installation
 
 ```bash
-dotnet add package AltV.Community.Messaging.Client
+dotnet add package AltV.Community.Messaging.Server
 ```
