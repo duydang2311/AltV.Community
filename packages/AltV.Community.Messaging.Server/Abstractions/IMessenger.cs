@@ -5,6 +5,8 @@ namespace AltV.Community.Messaging.Server.Abstractions;
 public interface IMessenger
 {
     void Publish(IPlayer player, string eventName, object?[]? args = null);
+    void Publish(IPlayer[] players, string eventName, object?[]? args = null);
+    void Publish(IEnumerable<IPlayer> players, string eventName, object?[]? args = null);
     Task<object?> SendAsync(IPlayer player, string eventName, object?[]? args = null);
     Task<T> SendAsync<T>(IPlayer player, string eventName, object?[]? args = null);
 

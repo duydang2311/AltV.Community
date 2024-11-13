@@ -20,6 +20,14 @@ public class Messenger(
         player.Emit(eventName, BuildArgs(0, args));
     }
 
+    public void Publish(IEnumerable<IPlayer> players, string eventName, object?[]? args = null) =>
+        Publish(players.ToArray(), eventName, args);
+
+    public void Publish(IPlayer[] players, string eventName, object?[]? args = null)
+    {
+        Alt.EmitClients(players, eventName, BuildArgs(0, args));
+    }
+
     public Task<object?> SendAsync(IPlayer player, string eventName, object?[]? args = null)
     {
         return SendAsync<object?>(player, eventName, args);
