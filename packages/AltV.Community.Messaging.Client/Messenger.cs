@@ -26,7 +26,7 @@ public class Messenger(
 
     public Task<T> SendAsync<T>(string eventName, object?[]? args = null)
     {
-        var bag = SendAsyncInternal(eventName, args);
+        var bag = SendAsyncInternal<T>(eventName, args);
         return MapInternal<T>(bag.TaskCompletionSource.Task);
     }
 
@@ -383,12 +383,12 @@ public class Messenger(
         );
     }
 
-    private StateBag SendAsyncInternal(string eventName, object?[]? args)
+    private StateBag SendAsyncInternal<T>(string eventName, object?[]? args)
     {
         var messageId = messageIdProvider.GetNext();
         if (!answerHandlers.ContainsKey(eventName))
         {
-            answerHandlers[eventName] = Alt.OnServer<long, object?>(eventName, Answer);
+            answerHandlers[eventName] = Alt.OnServer<long, T>(eventName, (messageId, answer) => AnswerInternal(messageId, answer));
         }
         var tcs = new TaskCompletionSource<object?>();
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -444,11 +444,11 @@ public class Messenger(
         // c# client sandbox forbids spread syntax
         var arr = new object?[args.Length + 1];
         arr[0] = messageId;
-        Array.Copy(args, 0, arr, 1, args.Length);
+        args.CopyTo(arr, 1);
         return arr;
     }
 
-    private void Answer(long messageId, object? answer)
+    private void AnswerInternal(long messageId, object? answer)
     {
         if (!messageBags.TryRemove(messageId, out var bag))
         {

@@ -35,7 +35,7 @@ public class Messenger(
 
     public Task<T> SendAsync<T>(IPlayer player, string eventName, object?[]? args = null)
     {
-        var bag = SendAsyncInternal(player, eventName, args);
+        var bag = SendAsyncInternal<T>(player, eventName, args);
         return MapInternal<T>(bag.TaskCompletionSource.Task);
     }
 
@@ -50,13 +50,13 @@ public class Messenger(
         bag.TaskCompletionSource.TrySetResult(answer);
     }
 
-    private StateBag SendAsyncInternal(IPlayer player, string eventName, object?[]? args)
+    private StateBag SendAsyncInternal<T>(IPlayer player, string eventName, object?[]? args)
     {
         var messageId = messageIdProvider.GetNext();
         var key = (player, messageId);
         if (!messageHandlers.ContainsKey(eventName))
         {
-            messageHandlers[eventName] = Alt.OnClient<IPlayer, long, object?>(eventName, Answer);
+            messageHandlers[eventName] = Alt.OnClient<IPlayer, long, T>(eventName, (player, messageId, answer) => Answer(player, messageId, answer));
         }
 
         var tcs = new TaskCompletionSource<object?>();

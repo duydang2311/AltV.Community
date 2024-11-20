@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>AltV.Community.Messaging.Client</PackageId>
-    <Version>0.0.5</Version>
+    <Version>0.0.6</Version>
     <Authors>duydang2311</Authors>
     <PackageTags>altv altv-client gtav gta5 messaging</PackageTags>
     <Description>Messaging implementation for alt:V client</Description>
