@@ -7,5 +7,5 @@ public interface IMessagingContext<TPlayer>
 {
     TPlayer Player { get; }
 
-    void Respond(object? value = null);
+    void Respond(object?[]? args = null);
 }

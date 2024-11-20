@@ -9,5 +9,5 @@ public sealed class ResponselessMessagingContext<TPlayer>(TPlayer player)
 {
     public TPlayer Player => player;
 
-    public void Respond(object? value = null) { }
+    public void Respond(object?[]? args = null) { }
 }

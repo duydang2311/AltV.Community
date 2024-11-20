@@ -7,12 +7,22 @@ public class MessagingContext(string eventName, long messageId) : IMessagingCont
 {
     private int responded;
 
-    public void Respond(object? value = null)
+    public void Respond(object?[]? args)
     {
         if (Interlocked.CompareExchange(ref responded, 1, 0) == 1)
         {
             return;
         }
-        Alt.EmitServer(eventName, messageId, value);
+
+        if (args is null)
+        {
+            Alt.EmitServer(eventName, messageId, null);
+            return;
+        }
+
+        var extended = new object?[args.Length + 1];
+        extended[0] = messageId;
+        args.CopyTo(extended, 1);
+        Alt.EmitServer(eventName, extended);
     }
 }

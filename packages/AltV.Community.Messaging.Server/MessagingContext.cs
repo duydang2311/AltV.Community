@@ -11,12 +11,19 @@ public class MessagingContext<TPlayer>(TPlayer player, long messageId, string ev
 
     public TPlayer Player => player;
 
-    public void Respond(object? value = null)
+    public void Respond(object?[]? args = null)
     {
         if (Interlocked.CompareExchange(ref responded, 1, 0) == 1)
         {
             return;
         }
-        player.Emit(eventName, messageId, value);
+
+        if (args is null)
+        {
+            player.Emit(eventName, messageId, null);
+            return;
+        }
+
+        player.Emit(eventName, [messageId, .. args]);
     }
 }

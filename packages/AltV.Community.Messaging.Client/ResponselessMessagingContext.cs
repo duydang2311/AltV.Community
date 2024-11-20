@@ -8,5 +8,5 @@ public sealed class ResponselessMessagingContext : IMessagingContext
 
     public static readonly ResponselessMessagingContext Instance = new();
 
-    public void Respond(object? value = null) { }
+    public void Respond(object?[]? args = null) { }
 }
